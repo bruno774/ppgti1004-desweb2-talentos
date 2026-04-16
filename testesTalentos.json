@@ -1,0 +1,1587 @@
+{
+  "info": {
+    "name": "Talentos API — Testes Completos",
+    "_postman_id": "talentos-collection-2026",
+    "description": "Collection completa de testes para a API do projeto Talentos (Spring Boot).\nCobre todos os endpoints REST das 5 entidades:\n- Servidores\n- Formaçõess\n- Oportunidades\n- Documentos\n- Inscrições\n\nCada pasta contém cenários de sucesso e de erro (validação e regra de negócio).\n\nOrdem recomendada de execução:\n1. Servidores → POST criar\n2. Oportunidades → POST criar\n3. Formações, Documentos → POST criar\n4. Inscrições → POST criar\n5. Filtros e cenários de erro",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8080",
+      "type": "string",
+      "description": "URL base da API. Altere se a porta for diferente."
+    },
+    {
+      "key": "servidorId",
+      "value": "1",
+      "type": "string",
+      "description": "ID gerado após criar o primeiro servidor"
+    },
+    {
+      "key": "oportunidadeId",
+      "value": "1",
+      "type": "string",
+      "description": "ID gerado após criar a primeira oportunidade"
+    },
+    {
+      "key": "formacaoId",
+      "value": "1",
+      "type": "string",
+      "description": "ID gerado após criar a primeira formação"
+    },
+    {
+      "key": "documentoId",
+      "value": "1",
+      "type": "string",
+      "description": "ID gerado após criar o primeiro documento"
+    },
+    {
+      "key": "inscricaoId",
+      "value": "1",
+      "type": "string",
+      "description": "ID gerado após criar a primeira inscrição"
+    }
+  ],
+  "item": [
+    {
+      "name": "1. Servidores",
+      "description": "Testes dos endpoints /servidores — CRUD completo + filtro por área + cenários de erro.",
+      "item": [
+        {
+          "name": "[GET] Listar todos os servidores",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/servidores",
+              "host": ["{{baseUrl}}"],
+              "path": ["servidores"]
+            },
+            "description": "Retorna todos os servidores cadastrados.\nEsperado: 200 OK com array (pode estar vazio)."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('Resposta é um array', () => {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body).to.be.an('array');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "[POST] Criar servidor — sucesso (201)",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{baseUrl}}/servidores",
+              "host": ["{{baseUrl}}"],
+              "path": ["servidores"]
+            },
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nome\": \"João Silva\",\n  \"cpf\": \"123.456.789-09\",\n  \"email\": \"joao.silva@gov.br\",\n  \"cargo\": \"Analista de Sistemas\",\n  \"areaAtuacao\": \"TECNOLOGIA\",\n  \"ativo\": true\n}"
+            },
+            "description": "Cria um servidor válido.\nEsperado: 201 Created + header Location + CPF mascarado na resposta."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 201 Created', () => pm.response.to.have.status(201));",
+                  "pm.test('Header Location presente', () => pm.response.to.have.header('Location'));",
+                  "pm.test('CPF está mascarado na resposta', () => {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body).to.not.have.property('cpf');",
+                  "    pm.expect(body).to.have.property('cpfMascarado');",
+                  "});",
+                  "pm.test('ID gerado automaticamente', () => {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body.id).to.be.a('number');",
+                  "    pm.collectionVariables.set('servidorId', body.id);",
+                  "});",
+                  "pm.test('areaAtuacao correta', () => {",
+                  "    pm.expect(pm.response.json().areaAtuacao).to.eql('TECNOLOGIA');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "[POST] Criar servidor — 400 campos obrigatórios em branco",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{baseUrl}}/servidores",
+              "host": ["{{baseUrl}}"],
+              "path": ["servidores"]
+            },
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nome\": \"\",\n  \"cpf\": \"\",\n  \"email\": \"email-invalido\",\n  \"cargo\": \"\"\n}"
+            },
+            "description": "Envia campos obrigatórios vazios e e-mail inválido.\nEsperado: 400 Bad Request com mapa de campos inválidos."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 400 Bad Request', () => pm.response.to.have.status(400));",
+                  "pm.test('Mensagem de validação presente', () => {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body.mensagem).to.include('Validação falhou');",
+                  "});",
+                  "pm.test('Campo \"nome\" com erro', () => {",
+                  "    pm.expect(pm.response.json().campos).to.have.property('nome');",
+                  "});",
+                  "pm.test('Campo \"email\" com erro', () => {",
+                  "    pm.expect(pm.response.json().campos).to.have.property('email');",
+                  "});",
+                  "pm.test('Campo \"areaAtuacao\" com erro', () => {",
+                  "    pm.expect(pm.response.json().campos).to.have.property('areaAtuacao');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "[POST] Criar servidor — 400 CPF com dígitos insuficientes (regra de negócio)",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{baseUrl}}/servidores",
+              "host": ["{{baseUrl}}"],
+              "path": ["servidores"]
+            },
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nome\": \"Maria Souza\",\n  \"cpf\": \"123\",\n  \"email\": \"maria@gov.br\",\n  \"cargo\": \"Médica\",\n  \"areaAtuacao\": \"SAUDE\",\n  \"ativo\": true\n}"
+            },
+            "description": "CPF com menos de 11 dígitos — viola regra de negócio no serviço.\nEsperado: 400 Bad Request com mensagem de CPF inválido."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 400 Bad Request', () => pm.response.to.have.status(400));",
+                  "pm.test('Mensagem menciona CPF', () => {",
+                  "    pm.expect(pm.response.json().mensagem).to.include('CPF');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "[GET] Buscar servidor por ID — sucesso (200)",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/servidores/{{servidorId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["servidores", "{{servidorId}}"]
+            },
+            "description": "Busca o servidor criado anteriormente pelo ID.\nEsperado: 200 OK com dados do servidor."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('ID correto na resposta', () => {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body.id).to.eql(parseInt(pm.collectionVariables.get('servidorId')));",
+                  "});",
+                  "pm.test('CPF mascarado presente', () => {",
+                  "    pm.expect(pm.response.json()).to.have.property('cpfMascarado');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "[GET] Buscar servidor por ID — 404 não encontrado",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/servidores/9999",
+              "host": ["{{baseUrl}}"],
+              "path": ["servidores", "9999"]
+            },
+            "description": "ID inexistente no repositório.\nEsperado: 404 Not Found com JSON de erro."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 404 Not Found', () => pm.response.to.have.status(404));",
+                  "pm.test('Corpo de erro presente', () => {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body.status).to.eql(404);",
+                  "    pm.expect(body.mensagem).to.include('9999');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "[GET] Filtrar servidores por categoria (área TECNOLOGIA)",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/servidores/categoria?area=TECNOLOGIA",
+              "host": ["{{baseUrl}}"],
+              "path": ["servidores", "categoria"],
+              "query": [{ "key": "area", "value": "TECNOLOGIA" }]
+            },
+            "description": "Filtra servidores pela área de atuação (enum AreaAtuacao).\nEsperado: 200 OK com lista de servidores da área TECNOLOGIA."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('Todos os resultados são da área TECNOLOGIA', () => {",
+                  "    const lista = pm.response.json();",
+                  "    pm.expect(lista).to.be.an('array');",
+                  "    lista.forEach(s => pm.expect(s.areaAtuacao).to.eql('TECNOLOGIA'));",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "[PUT] Atualizar servidor — sucesso (200)",
+          "request": {
+            "method": "PUT",
+            "url": {
+              "raw": "{{baseUrl}}/servidores/{{servidorId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["servidores", "{{servidorId}}"]
+            },
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nome\": \"João Silva Atualizado\",\n  \"cpf\": \"123.456.789-09\",\n  \"email\": \"joao.silva.novo@gov.br\",\n  \"cargo\": \"Analista Sênior\",\n  \"areaAtuacao\": \"TECNOLOGIA\",\n  \"ativo\": true\n}"
+            },
+            "description": "Atualiza os dados do servidor existente.\nEsperado: 200 OK com dados atualizados."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('Nome foi atualizado', () => {",
+                  "    pm.expect(pm.response.json().nome).to.eql('João Silva Atualizado');",
+                  "});",
+                  "pm.test('Cargo foi atualizado', () => {",
+                  "    pm.expect(pm.response.json().cargo).to.eql('Analista Sênior');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "[PUT] Atualizar servidor — 404 não encontrado",
+          "request": {
+            "method": "PUT",
+            "url": {
+              "raw": "{{baseUrl}}/servidores/9999",
+              "host": ["{{baseUrl}}"],
+              "path": ["servidores", "9999"]
+            },
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nome\": \"Inexistente\",\n  \"cpf\": \"111.222.333-44\",\n  \"email\": \"x@gov.br\",\n  \"cargo\": \"Cargo\",\n  \"areaAtuacao\": \"ADMINISTRATIVO\",\n  \"ativo\": true\n}"
+            },
+            "description": "Tenta atualizar um servidor com ID inexistente.\nEsperado: 404 Not Found."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 404 Not Found', () => pm.response.to.have.status(404));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "[DELETE] Deletar servidor — sucesso (204)",
+          "request": {
+            "method": "DELETE",
+            "url": {
+              "raw": "{{baseUrl}}/servidores/{{servidorId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["servidores", "{{servidorId}}"]
+            },
+            "description": "Remove o servidor existente.\nEsperado: 204 No Content sem corpo."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 204 No Content', () => pm.response.to.have.status(204));",
+                  "pm.test('Corpo vazio', () => pm.expect(pm.response.text()).to.eql(''));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "[DELETE] Deletar servidor — 404 não encontrado",
+          "request": {
+            "method": "DELETE",
+            "url": {
+              "raw": "{{baseUrl}}/servidores/9999",
+              "host": ["{{baseUrl}}"],
+              "path": ["servidores", "9999"]
+            },
+            "description": "Tenta deletar um servidor com ID inexistente.\nEsperado: 404 Not Found."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 404 Not Found', () => pm.response.to.have.status(404));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "2. Oportunidades",
+      "description": "Testes dos endpoints /oportunidades — CRUD + filtros por status e área + regras de negócio.",
+      "item": [
+        {
+          "name": "[GET] Listar todas as oportunidades",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/oportunidades",
+              "host": ["{{baseUrl}}"],
+              "path": ["oportunidades"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('Resposta é um array', () => pm.expect(pm.response.json()).to.be.an('array'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "[POST] Criar oportunidade — sucesso (201)",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{baseUrl}}/oportunidades",
+              "host": ["{{baseUrl}}"],
+              "path": ["oportunidades"]
+            },
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"titulo\": \"Desenvolvedor Sênior\",\n  \"descricao\": \"Vaga para desenvolvimento de sistemas críticos\",\n  \"areaAtuacao\": \"TECNOLOGIA\",\n  \"vagas\": 3,\n  \"status\": \"ABERTA\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 201 Created', () => pm.response.to.have.status(201));",
+                  "pm.test('ID gerado e salvo', () => {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body.id).to.be.a('number');",
+                  "    pm.collectionVariables.set('oportunidadeId', body.id);",
+                  "});",
+                  "pm.test('Status ABERTA', () => pm.expect(pm.response.json().status).to.eql('ABERTA'));",
+                  "pm.test('Vagas corretas', () => pm.expect(pm.response.json().vagas).to.eql(3));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "[POST] Criar oportunidade — 400 campos obrigatórios ausentes",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{baseUrl}}/oportunidades",
+              "host": ["{{baseUrl}}"],
+              "path": ["oportunidades"]
+            },
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"titulo\": \"\",\n  \"vagas\": 0\n}"
+            },
+            "description": "Título vazio, vagas = 0 (mínimo é 1), área e status ausentes.\nEsperado: 400 com mapa de campos."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 400 Bad Request', () => pm.response.to.have.status(400));",
+                  "pm.test('Erro de validação no titulo', () => {",
+                  "    pm.expect(pm.response.json().campos).to.have.property('titulo');",
+                  "});",
+                  "pm.test('Erro de validação nas vagas', () => {",
+                  "    pm.expect(pm.response.json().campos).to.have.property('vagas');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "[POST] Criar oportunidade — 400 status CANCELADA (regra de negócio)",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{baseUrl}}/oportunidades",
+              "host": ["{{baseUrl}}"],
+              "path": ["oportunidades"]
+            },
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"titulo\": \"Vaga Cancelada\",\n  \"descricao\": \"Não deveria ser criada\",\n  \"areaAtuacao\": \"JURIDICO\",\n  \"vagas\": 1,\n  \"status\": \"CANCELADA\"\n}"
+            },
+            "description": "Regra de negócio: não é permitido criar uma oportunidade já cancelada.\nEsperado: 400 com mensagem de negócio."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 400 Bad Request', () => pm.response.to.have.status(400));",
+                  "pm.test('Mensagem sobre status cancelada', () => {",
+                  "    pm.expect(pm.response.json().mensagem).to.include('cancelada');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "[GET] Buscar oportunidade por ID — sucesso (200)",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/oportunidades/{{oportunidadeId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["oportunidades", "{{oportunidadeId}}"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('ID correto', () => {",
+                  "    pm.expect(pm.response.json().id).to.eql(parseInt(pm.collectionVariables.get('oportunidadeId')));",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "[GET] Buscar oportunidade por ID — 404 não encontrado",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/oportunidades/9999",
+              "host": ["{{baseUrl}}"],
+              "path": ["oportunidades", "9999"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 404 Not Found', () => pm.response.to.have.status(404));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "[GET] Filtrar oportunidades por categoria (status ABERTA)",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/oportunidades/categoria?status=ABERTA",
+              "host": ["{{baseUrl}}"],
+              "path": ["oportunidades", "categoria"],
+              "query": [{ "key": "status", "value": "ABERTA" }]
+            },
+            "description": "Filtra oportunidades pelo status (enum StatusOportunidade)."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('Todos os resultados têm status ABERTA', () => {",
+                  "    pm.response.json().forEach(o => pm.expect(o.status).to.eql('ABERTA'));",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "[GET] Filtrar oportunidades por área de atuação (TECNOLOGIA)",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/oportunidades/area?area=TECNOLOGIA",
+              "host": ["{{baseUrl}}"],
+              "path": ["oportunidades", "area"],
+              "query": [{ "key": "area", "value": "TECNOLOGIA" }]
+            },
+            "description": "Filtro secundário: por área de atuação."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('Todos os resultados são área TECNOLOGIA', () => {",
+                  "    pm.response.json().forEach(o => pm.expect(o.areaAtuacao).to.eql('TECNOLOGIA'));",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "[PUT] Atualizar oportunidade — sucesso (200)",
+          "request": {
+            "method": "PUT",
+            "url": {
+              "raw": "{{baseUrl}}/oportunidades/{{oportunidadeId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["oportunidades", "{{oportunidadeId}}"]
+            },
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"titulo\": \"Desenvolvedor Sênior — Atualizado\",\n  \"descricao\": \"Descrição atualizada\",\n  \"areaAtuacao\": \"TECNOLOGIA\",\n  \"vagas\": 5,\n  \"status\": \"EM_ANALISE\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('Vagas atualizadas para 5', () => pm.expect(pm.response.json().vagas).to.eql(5));",
+                  "pm.test('Status atualizado para EM_ANALISE', () => pm.expect(pm.response.json().status).to.eql('EM_ANALISE'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "[DELETE] Deletar oportunidade — sucesso (204)",
+          "request": {
+            "method": "DELETE",
+            "url": {
+              "raw": "{{baseUrl}}/oportunidades/{{oportunidadeId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["oportunidades", "{{oportunidadeId}}"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 204 No Content', () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "[DELETE] Deletar oportunidade — 404 não encontrado",
+          "request": {
+            "method": "DELETE",
+            "url": {
+              "raw": "{{baseUrl}}/oportunidades/9999",
+              "host": ["{{baseUrl}}"],
+              "path": ["oportunidades", "9999"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 404 Not Found', () => pm.response.to.have.status(404));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "3. Formações",
+      "description": "Testes dos endpoints /formacoes — CRUD + filtro por nível de formação + regras de negócio.",
+      "item": [
+        {
+          "name": "[PRÉ-REQUISITO] Recriar servidor para testes",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{baseUrl}}/servidores",
+              "host": ["{{baseUrl}}"],
+              "path": ["servidores"]
+            },
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nome\": \"Ana Lima\",\n  \"cpf\": \"987.654.321-00\",\n  \"email\": \"ana.lima@gov.br\",\n  \"cargo\": \"Professora\",\n  \"areaAtuacao\": \"EDUCACAO\",\n  \"ativo\": true\n}"
+            },
+            "description": "Cria servidor para ser usado nos testes de formação, documento e inscrição."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 201', () => pm.response.to.have.status(201));",
+                  "pm.collectionVariables.set('servidorId', pm.response.json().id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "[GET] Listar todas as formações",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/formacoes",
+              "host": ["{{baseUrl}}"],
+              "path": ["formacoes"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('Array na resposta', () => pm.expect(pm.response.json()).to.be.an('array'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "[POST] Criar formação — sucesso (201)",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{baseUrl}}/formacoes",
+              "host": ["{{baseUrl}}"],
+              "path": ["formacoes"]
+            },
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"idServidor\": {{servidorId}},\n  \"instituicao\": \"Universidade de Brasília\",\n  \"curso\": \"Ciência da Computação\",\n  \"nivel\": \"GRADUACAO\",\n  \"anoConclusao\": 2015\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 201 Created', () => pm.response.to.have.status(201));",
+                  "pm.test('Nível correto', () => pm.expect(pm.response.json().nivel).to.eql('GRADUACAO'));",
+                  "pm.test('ID gerado e salvo', () => {",
+                  "    pm.collectionVariables.set('formacaoId', pm.response.json().id);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "[POST] Criar formação — 400 campos obrigatórios ausentes",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{baseUrl}}/formacoes",
+              "host": ["{{baseUrl}}"],
+              "path": ["formacoes"]
+            },
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"instituicao\": \"\",\n  \"curso\": \"\",\n  \"anoConclusao\": 1800\n}"
+            },
+            "description": "idServidor ausente, campos vazios, ano abaixo do mínimo (1900)."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 400', () => pm.response.to.have.status(400));",
+                  "pm.test('Erro em idServidor', () => pm.expect(pm.response.json().campos).to.have.property('idServidor'));",
+                  "pm.test('Erro em anoConclusao (menor que 1900)', () => {",
+                  "    pm.expect(pm.response.json().campos).to.have.property('anoConclusao');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "[POST] Criar formação — 400 servidor inexistente (regra de negócio)",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{baseUrl}}/formacoes",
+              "host": ["{{baseUrl}}"],
+              "path": ["formacoes"]
+            },
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"idServidor\": 9999,\n  \"instituicao\": \"UFMG\",\n  \"curso\": \"Direito\",\n  \"nivel\": \"GRADUACAO\",\n  \"anoConclusao\": 2010\n}"
+            },
+            "description": "Servidor com ID 9999 não existe — RegraNegocioException."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 400 Bad Request', () => pm.response.to.have.status(400));",
+                  "pm.test('Mensagem menciona servidor', () => {",
+                  "    pm.expect(pm.response.json().mensagem.toLowerCase()).to.include('servidor');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "[POST] Criar formação — 400 ano de conclusão futuro (regra de negócio)",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{baseUrl}}/formacoes",
+              "host": ["{{baseUrl}}"],
+              "path": ["formacoes"]
+            },
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"idServidor\": {{servidorId}},\n  \"instituicao\": \"USP\",\n  \"curso\": \"Engenharia\",\n  \"nivel\": \"MESTRADO\",\n  \"anoConclusao\": 2099\n}"
+            },
+            "description": "Ano de conclusão no futuro — RegraNegocioException."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 400 Bad Request', () => pm.response.to.have.status(400));",
+                  "pm.test('Mensagem menciona futuro', () => {",
+                  "    pm.expect(pm.response.json().mensagem.toLowerCase()).to.include('futuro');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "[GET] Buscar formação por ID — sucesso",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/formacoes/{{formacaoId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["formacoes", "{{formacaoId}}"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('ID correto', () => pm.expect(pm.response.json().id).to.eql(parseInt(pm.collectionVariables.get('formacaoId'))));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "[GET] Buscar formação por ID — 404",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/formacoes/9999",
+              "host": ["{{baseUrl}}"],
+              "path": ["formacoes", "9999"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 404 Not Found', () => pm.response.to.have.status(404));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "[GET] Filtrar formações por categoria (nível GRADUACAO)",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/formacoes/categoria?nivel=GRADUACAO",
+              "host": ["{{baseUrl}}"],
+              "path": ["formacoes", "categoria"],
+              "query": [{ "key": "nivel", "value": "GRADUACAO" }]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('Todos os resultados são GRADUACAO', () => {",
+                  "    pm.response.json().forEach(f => pm.expect(f.nivel).to.eql('GRADUACAO'));",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "[PUT] Atualizar formação — sucesso",
+          "request": {
+            "method": "PUT",
+            "url": {
+              "raw": "{{baseUrl}}/formacoes/{{formacaoId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["formacoes", "{{formacaoId}}"]
+            },
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"idServidor\": {{servidorId}},\n  \"instituicao\": \"UnB — Atualizada\",\n  \"curso\": \"Ciência da Computação\",\n  \"nivel\": \"MESTRADO\",\n  \"anoConclusao\": 2018\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('Nível atualizado para MESTRADO', () => pm.expect(pm.response.json().nivel).to.eql('MESTRADO'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "[DELETE] Deletar formação — sucesso",
+          "request": {
+            "method": "DELETE",
+            "url": {
+              "raw": "{{baseUrl}}/formacoes/{{formacaoId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["formacoes", "{{formacaoId}}"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 204 No Content', () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "4. Documentos",
+      "description": "Testes dos endpoints /documentos — CRUD + filtro por tipo + regras de negócio.",
+      "item": [
+        {
+          "name": "[GET] Listar todos os documentos",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/documentos",
+              "host": ["{{baseUrl}}"],
+              "path": ["documentos"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('Array na resposta', () => pm.expect(pm.response.json()).to.be.an('array'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "[POST] Criar documento — sucesso (201)",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{baseUrl}}/documentos",
+              "host": ["{{baseUrl}}"],
+              "path": ["documentos"]
+            },
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"idServidor\": {{servidorId}},\n  \"nome\": \"Diploma de Graduação\",\n  \"tipo\": \"DIPLOMA\",\n  \"urlArquivo\": \"https://storage.gov.br/diplomas/ana-lima.pdf\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 201 Created', () => pm.response.to.have.status(201));",
+                  "pm.test('dataUpload preenchida automaticamente', () => {",
+                  "    pm.expect(pm.response.json().dataUpload).to.not.be.null;",
+                  "});",
+                  "pm.test('Tipo correto', () => pm.expect(pm.response.json().tipo).to.eql('DIPLOMA'));",
+                  "pm.test('ID salvo', () => { pm.collectionVariables.set('documentoId', pm.response.json().id); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "[POST] Criar documento — 400 campos obrigatórios ausentes",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{baseUrl}}/documentos",
+              "host": ["{{baseUrl}}"],
+              "path": ["documentos"]
+            },
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nome\": \"\",\n  \"urlArquivo\": \"\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 400', () => pm.response.to.have.status(400));",
+                  "pm.test('Erros de campos obrigatórios', () => {",
+                  "    const campos = pm.response.json().campos;",
+                  "    pm.expect(campos).to.have.property('idServidor');",
+                  "    pm.expect(campos).to.have.property('tipo');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "[POST] Criar documento — 400 servidor inexistente (regra de negócio)",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{baseUrl}}/documentos",
+              "host": ["{{baseUrl}}"],
+              "path": ["documentos"]
+            },
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"idServidor\": 9999,\n  \"nome\": \"CPF\",\n  \"tipo\": \"CPF\",\n  \"urlArquivo\": \"https://storage.gov.br/cpf.pdf\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 400 Bad Request', () => pm.response.to.have.status(400));",
+                  "pm.test('Mensagem menciona servidor', () => {",
+                  "    pm.expect(pm.response.json().mensagem.toLowerCase()).to.include('servidor');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "[GET] Buscar documento por ID — sucesso",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/documentos/{{documentoId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["documentos", "{{documentoId}}"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 OK', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "[GET] Buscar documento por ID — 404 não encontrado",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/documentos/9999",
+              "host": ["{{baseUrl}}"],
+              "path": ["documentos", "9999"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 404 Not Found', () => pm.response.to.have.status(404));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "[GET] Filtrar documentos por categoria (tipo DIPLOMA)",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/documentos/categoria?tipo=DIPLOMA",
+              "host": ["{{baseUrl}}"],
+              "path": ["documentos", "categoria"],
+              "query": [{ "key": "tipo", "value": "DIPLOMA" }]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('Todos do tipo DIPLOMA', () => {",
+                  "    pm.response.json().forEach(d => pm.expect(d.tipo).to.eql('DIPLOMA'));",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "[PUT] Atualizar documento — sucesso",
+          "request": {
+            "method": "PUT",
+            "url": {
+              "raw": "{{baseUrl}}/documentos/{{documentoId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["documentos", "{{documentoId}}"]
+            },
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"idServidor\": {{servidorId}},\n  \"nome\": \"Diploma Atualizado\",\n  \"tipo\": \"CERTIFICADO\",\n  \"urlArquivo\": \"https://storage.gov.br/certificado-atualizado.pdf\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('Tipo atualizado para CERTIFICADO', () => pm.expect(pm.response.json().tipo).to.eql('CERTIFICADO'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "[DELETE] Deletar documento — sucesso",
+          "request": {
+            "method": "DELETE",
+            "url": {
+              "raw": "{{baseUrl}}/documentos/{{documentoId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["documentos", "{{documentoId}}"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 204 No Content', () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "5. Inscrições",
+      "description": "Testes dos endpoints /inscricoes — CRUD + filtro por status + regras de negócio complexas (servidor ativo, oportunidade aberta, sem duplicata).",
+      "item": [
+        {
+          "name": "[PRÉ-REQUISITO] Recriar oportunidade ABERTA",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{baseUrl}}/oportunidades",
+              "host": ["{{baseUrl}}"],
+              "path": ["oportunidades"]
+            },
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"titulo\": \"Analista Educacional\",\n  \"descricao\": \"Vaga para área de educação\",\n  \"areaAtuacao\": \"EDUCACAO\",\n  \"vagas\": 2,\n  \"status\": \"ABERTA\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 201', () => pm.response.to.have.status(201));",
+                  "pm.collectionVariables.set('oportunidadeId', pm.response.json().id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "[GET] Listar todas as inscrições",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/inscricoes",
+              "host": ["{{baseUrl}}"],
+              "path": ["inscricoes"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('Array na resposta', () => pm.expect(pm.response.json()).to.be.an('array'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "[POST] Criar inscrição — sucesso (201)",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{baseUrl}}/inscricoes",
+              "host": ["{{baseUrl}}"],
+              "path": ["inscricoes"]
+            },
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"idServidor\": {{servidorId}},\n  \"idOportunidade\": {{oportunidadeId}}\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 201 Created', () => pm.response.to.have.status(201));",
+                  "pm.test('Status inicial PENDENTE', () => pm.expect(pm.response.json().status).to.eql('PENDENTE'));",
+                  "pm.test('dataInscricao preenchida', () => pm.expect(pm.response.json().dataInscricao).to.not.be.null);",
+                  "pm.test('ID salvo', () => { pm.collectionVariables.set('inscricaoId', pm.response.json().id); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "[POST] Criar inscrição — 400 campos obrigatórios ausentes",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{baseUrl}}/inscricoes",
+              "host": ["{{baseUrl}}"],
+              "path": ["inscricoes"]
+            },
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 400', () => pm.response.to.have.status(400));",
+                  "pm.test('Erro em idServidor', () => pm.expect(pm.response.json().campos).to.have.property('idServidor'));",
+                  "pm.test('Erro em idOportunidade', () => pm.expect(pm.response.json().campos).to.have.property('idOportunidade'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "[POST] Criar inscrição — 400 duplicata (regra de negócio)",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{baseUrl}}/inscricoes",
+              "host": ["{{baseUrl}}"],
+              "path": ["inscricoes"]
+            },
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"idServidor\": {{servidorId}},\n  \"idOportunidade\": {{oportunidadeId}}\n}"
+            },
+            "description": "Mesma combinação servidor+oportunidade — inscrição duplicada.\nEsperado: 400 com mensagem sobre duplicata."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 400 Bad Request', () => pm.response.to.have.status(400));",
+                  "pm.test('Mensagem sobre inscrição duplicada', () => {",
+                  "    pm.expect(pm.response.json().mensagem.toLowerCase()).to.include('inscrito');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "[POST] Criar inscrição — 400 servidor inexistente (regra de negócio)",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{baseUrl}}/inscricoes",
+              "host": ["{{baseUrl}}"],
+              "path": ["inscricoes"]
+            },
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"idServidor\": 9999,\n  \"idOportunidade\": {{oportunidadeId}}\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 400 Bad Request', () => pm.response.to.have.status(400));",
+                  "pm.test('Mensagem sobre servidor', () => {",
+                  "    pm.expect(pm.response.json().mensagem.toLowerCase()).to.include('servidor');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "[POST] Criar inscrição — 400 oportunidade não aberta (regra de negócio)",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{baseUrl}}/inscricoes",
+              "host": ["{{baseUrl}}"],
+              "path": ["inscricoes"]
+            },
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"idServidor\": {{servidorId}},\n  \"idOportunidade\": 9999\n}"
+            },
+            "description": "Oportunidade 9999 não existe, logo não está aberta.\nEsperado: 400 com mensagem sobre oportunidade."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 400 Bad Request', () => pm.response.to.have.status(400));",
+                  "pm.test('Mensagem sobre oportunidade', () => {",
+                  "    pm.expect(pm.response.json().mensagem.toLowerCase()).to.include('oportunidade');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "[GET] Buscar inscrição por ID — sucesso",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/inscricoes/{{inscricaoId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["inscricoes", "{{inscricaoId}}"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('ID correto', () => pm.expect(pm.response.json().id).to.eql(parseInt(pm.collectionVariables.get('inscricaoId'))));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "[GET] Buscar inscrição por ID — 404 não encontrado",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/inscricoes/9999",
+              "host": ["{{baseUrl}}"],
+              "path": ["inscricoes", "9999"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 404 Not Found', () => pm.response.to.have.status(404));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "[GET] Filtrar inscrições por categoria (status PENDENTE)",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/inscricoes/categoria?status=PENDENTE",
+              "host": ["{{baseUrl}}"],
+              "path": ["inscricoes", "categoria"],
+              "query": [{ "key": "status", "value": "PENDENTE" }]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('Todos com status PENDENTE', () => {",
+                  "    pm.response.json().forEach(i => pm.expect(i.status).to.eql('PENDENTE'));",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "[PUT] Atualizar inscrição — sucesso",
+          "request": {
+            "method": "PUT",
+            "url": {
+              "raw": "{{baseUrl}}/inscricoes/{{inscricaoId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["inscricoes", "{{inscricaoId}}"]
+            },
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"idServidor\": {{servidorId}},\n  \"idOportunidade\": {{oportunidadeId}}\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 OK', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "[DELETE] Deletar inscrição — sucesso",
+          "request": {
+            "method": "DELETE",
+            "url": {
+              "raw": "{{baseUrl}}/inscricoes/{{inscricaoId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["inscricoes", "{{inscricaoId}}"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 204 No Content', () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "[DELETE] Deletar inscrição — 404 não encontrado",
+          "request": {
+            "method": "DELETE",
+            "url": {
+              "raw": "{{baseUrl}}/inscricoes/9999",
+              "host": ["{{baseUrl}}"],
+              "path": ["inscricoes", "9999"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 404 Not Found', () => pm.response.to.have.status(404));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

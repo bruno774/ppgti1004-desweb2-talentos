@@ -22,8 +22,8 @@ public class InscricaoResponseDTO {
     public static InscricaoResponseDTO de(Inscricao inscricao) {
         InscricaoResponseDTO dto = new InscricaoResponseDTO();
         dto.id = inscricao.getId();
-        dto.idServidor = inscricao.getIdServidor();
-        dto.idOportunidade = inscricao.getIdOportunidade();
+        dto.idServidor = inscricao.getServidor().getId();
+        dto.idOportunidade = inscricao.getOportunidade().getId();
         dto.dataInscricao = inscricao.getDataInscricao();
         dto.status = inscricao.getStatus();
         return dto;

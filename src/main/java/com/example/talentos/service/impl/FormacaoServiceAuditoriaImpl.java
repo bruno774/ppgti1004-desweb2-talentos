@@ -2,35 +2,44 @@ package com.example.talentos.service.impl;
 
 import com.example.talentos.dto.FormacaoRequestDTO;
 import com.example.talentos.dto.FormacaoResponseDTO;
+import com.example.talentos.model.auditoria.RegistroAuditoria;
 import com.example.talentos.model.enums.NivelFormacao;
+import com.example.talentos.repository.auditoria.AuditoriaJpaRepository;
 import com.example.talentos.service.FormacaoService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
 
 /**
  * Implementação de <strong>auditoria</strong> de FormacaoService.
- * Delega para {@link FormacaoServiceImpl} adicionando logging de auditoria.
+ * Delega para {@link FormacaoServiceImpl} adicionando logging e persistência de auditoria.
  */
 @Service
 @Qualifier("auditoria")
 public class FormacaoServiceAuditoriaImpl implements FormacaoService {
 
     private static final Logger log = LoggerFactory.getLogger(FormacaoServiceAuditoriaImpl.class);
-    private final FormacaoService delegate;
 
-    public FormacaoServiceAuditoriaImpl(@Qualifier("padrao") FormacaoService delegate) {
+    private final FormacaoService delegate;
+    private final AuditoriaJpaRepository auditoriaRepository;
+
+    public FormacaoServiceAuditoriaImpl(@Qualifier("padrao") FormacaoService delegate,
+                                        AuditoriaJpaRepository auditoriaRepository) {
         this.delegate = delegate;
+        this.auditoriaRepository = auditoriaRepository;
     }
 
     @Override
     public FormacaoResponseDTO criar(FormacaoRequestDTO dto) {
         log.info("[AUDITORIA] {} - criar formação para servidor ID={}", LocalDateTime.now(), dto.getIdServidor());
         FormacaoResponseDTO resultado = delegate.criar(dto);
+        registrar("CRIAR", resultado.getId(),
+                "curso=" + dto.getCurso() + ", nivel=" + dto.getNivel());
         log.info("[AUDITORIA] {} - formação criada ID={}", LocalDateTime.now(), resultado.getId());
         return resultado;
     }
@@ -38,31 +47,48 @@ public class FormacaoServiceAuditoriaImpl implements FormacaoService {
     @Override
     public FormacaoResponseDTO buscarPorId(Long id) {
         log.info("[AUDITORIA] {} - buscar formação ID={}", LocalDateTime.now(), id);
+        registrar("BUSCAR", id, null);
         return delegate.buscarPorId(id);
     }
 
     @Override
     public List<FormacaoResponseDTO> buscarTodos() {
         log.info("[AUDITORIA] {} - listar todas as formações", LocalDateTime.now());
+        registrar("BUSCAR", null, "listagem completa");
         return delegate.buscarTodos();
     }
 
     @Override
     public List<FormacaoResponseDTO> buscarPorNivel(NivelFormacao nivel) {
         log.info("[AUDITORIA] {} - buscar formações por nível={}", LocalDateTime.now(), nivel);
+        registrar("BUSCAR", null, "nivel=" + nivel);
         return delegate.buscarPorNivel(nivel);
     }
 
     @Override
     public FormacaoResponseDTO atualizar(Long id, FormacaoRequestDTO dto) {
         log.info("[AUDITORIA] {} - atualizar formação ID={}", LocalDateTime.now(), id);
-        return delegate.atualizar(id, dto);
+        FormacaoResponseDTO resultado = delegate.atualizar(id, dto);
+        registrar("ATUALIZAR", id, "curso=" + dto.getCurso());
+        return resultado;
     }
 
     @Override
     public void deletar(Long id) {
         log.info("[AUDITORIA] {} - deletar formação ID={}", LocalDateTime.now(), id);
         delegate.deletar(id);
+        registrar("DELETAR", id, null);
         log.info("[AUDITORIA] {} - formação ID={} deletada", LocalDateTime.now(), id);
+    }
+
+    @Transactional("auditoriaTransactionManager")
+    protected void registrar(String operacao, Long idEntidade, String dados) {
+        auditoriaRepository.save(RegistroAuditoria.builder()
+                .entidade("Formacao")
+                .operacao(operacao)
+                .idEntidade(idEntidade)
+                .dados(dados)
+                .timestamp(LocalDateTime.now())
+                .build());
     }
 }

@@ -23,7 +23,7 @@ public class DocumentoResponseDTO {
     public static DocumentoResponseDTO de(Documento documento) {
         DocumentoResponseDTO dto = new DocumentoResponseDTO();
         dto.id = documento.getId();
-        dto.idServidor = documento.getIdServidor();
+        dto.idServidor = documento.getServidor().getId();
         dto.nome = documento.getNome();
         dto.tipo = documento.getTipo();
         dto.urlArquivo = documento.getUrlArquivo();

@@ -36,36 +36,80 @@ Optou-se por uma **API REST com persistência em memória** como ponto de partid
 | Decisão | Justificativa |
 |---|---|
 | **API REST** | Padrão amplamente adotado, agnóstico de frontend; permite integração futura com portais web, sistemas legados ou aplicativos mobile |
-| **Spring Boot** | Framework maduro, com ecossistema robusto de validação, injeção de dependências e tratamento de erros — reduz tempo de desenvolvimento sem abrir mão de boas práticas |
-| **Persistência em memória** | Fase inicial de prova de conceito: permite validar o modelo de dados e as regras de negócio sem custo de infraestrutura de banco de dados |
-| **Separação Model / DTO** | Garante que dados sensíveis (ex: CPF completo) nunca sejam expostos pela API; permite evoluir a representação pública sem quebrar o modelo interno |
-| **Enums para categorias** | Categorias como área de atuação, nível de formação e status de inscrição são controladas, evitando inconsistências por digitação livre |
-| **Validação na entrada** | Dados inválidos são rejeitados antes de qualquer processamento, reduzindo bugs e garantindo integridade das informações |
-| **Baixo acoplamento via interfaces** | Facilita substituição de implementações (ex: trocar mock por banco de dados real) sem impacto nos controllers — preparado para crescer |
+| **Spring Boot** | Framework maduro, com ecossistema robusto de validação, injeção de dependências e tratamento de erros |
+| **Multi-Database (Supabase)** | Arquitetura com dois bancos PostgreSQL: um para Negócio e outro para Auditoria, garantindo isolamento de dados e segurança |
+| **Spring Data JPA** | Abstração de persistência poderosa, gerenciando relacionamentos, transações e mapeamento objeto-relacional (ORM) |
+| **Separação Model / DTO** | Garante que dados sensíveis nunca sejam expostos pela API; permite evoluir a representação pública sem quebrar o modelo interno |
+| **Enums para categorias** | Categorias como área de atuação, nível de formação e status de inscrição são controladas via Enums Java |
+| **Validação na entrada** | Uso de Bean Validation (Jakarta) para garantir integridade dos dados antes do processamento |
+| **Baixo acoplamento via interfaces** | Implementações de serviço intercambiáveis (@Qualifier) via ApplicationContext |
 
 ---
 
-## Entidades do Domínio
+## Diagrama de Classes e Relacionamentos
 
-```
-Servidor ──────────────── Formacao
-    │                    (nível acadêmico, instituição, curso)
-    │
-    ├──────────────────── Documento
-    │                    (CPF, diploma, certificado, laudo)
-    │
-    └──────────────────── Inscricao ──── Oportunidade
-                         (status: PENDENTE,          (ABERTA, EM_ANALISE,
-                          EM_ANALISE, APROVADA...)    ENCERRADA, CANCELADA)
+O sistema utiliza **Spring Data JPA** para persistência, com relacionamentos formalizados e controle de ciclo de vida via **CascadeType**.
+
+```mermaid
+classDiagram
+    direction LR
+    class Servidor {
+        +Long id
+        +String nome
+        +String cpf
+        +String email
+        +AreaAtuacao areaAtuacao
+        +boolean ativo
+    }
+    class Oportunidade {
+        +Long id
+        +String titulo
+        +AreaAtuacao areaAtuacao
+        +Integer vagas
+        +StatusOportunidade status
+    }
+    class Inscricao {
+        +Long id
+        +LocalDate dataInscricao
+        +StatusInscricao status
+    }
+    class Documento {
+        +Long id
+        +String nome
+        +TipoDocumento tipo
+        +String urlArquivo
+    }
+    class Formacao {
+        +Long id
+        +String instituicao
+        +NivelFormacao nivel
+        +Integer anoConclusao
+    }
+    class RegistroAuditoria {
+        +Long id
+        +String entidade
+        +String operacao
+        +LocalDateTime timestamp
+    }
+
+    Servidor "1" -- "*" Documento : possui (Cascade ALL)
+    Servidor "1" -- "*" Formacao : possui (Cascade ALL)
+    Servidor "1" -- "*" Inscricao : realiza (Cascade ALL)
+    Oportunidade "1" -- "*" Inscricao : possui (Cascade ALL)
+    
+    note for RegistroAuditoria "Armazenado em base \nde auditoria separada"
 ```
 
-| Entidade | Finalidade |
-|---|---|
-| **Servidor** | Cadastro central do servidor: dados funcionais, área e status ativo |
-| **Formação** | Histórico acadêmico vinculado ao servidor (graduação, especialização, etc.) |
-| **Documento** | Comprovantes e anexos digitais do servidor (diploma, RG, laudos) |
-| **Oportunidade** | Vagas, comissões, projetos ou cursos publicados pela instituição |
-| **Inscrição** | Relaciona servidor e oportunidade, com rastreamento de status e data |
+### Detalhamento dos Relacionamentos
+
+| Relacionamento | Tipo | Descrição | Comportamento (Cascade) |
+|---|---|---|---|
+| **Servidor → Inscricao** | 1:N | Um servidor possui várias inscrições | `ALL` + `orphanRemoval` (excluir servidor limpa inscrições) |
+| **Servidor → Documento** | 1:N | Um servidor possui vários documentos | `ALL` + `orphanRemoval` (excluir servidor limpa documentos) |
+| **Servidor → Formação** | 1:N | Um servidor possui várias formações | `ALL` + `orphanRemoval` (excluir servidor limpa formações) |
+| **Oportunidade → Inscricao** | 1:N | Uma vaga recebe várias inscrições | `ALL` (excluir vaga remove inscrições vinculadas) |
+| **Inscrição → Servidor** | N:1 | Inscrição referencia um servidor | — |
+| **Inscrição → Oportunidade** | N:1 | Inscrição referencia uma vaga | — |
 
 ---
 
@@ -74,11 +118,13 @@ Servidor ──────────────── Formacao
 | Tecnologia | Versão | Uso |
 |---|---|---|
 | Java | 17 | Linguagem principal |
-| Spring Boot | 4.0.5 | Framework web e de injeção de dependências |
-| Spring Web MVC | — | Camada de controllers REST |
-| Spring Validation | — | Validação declarativa com Bean Validation (Jakarta) |
-| Lombok | — | Redução de boilerplate (getters, setters, builders) |
-| SLF4J | — | Logging na implementação de auditoria |
+| Spring Boot | 4.0.5 | Framework principal |
+| Spring Data JPA | — | Persistência e ORM |
+| PostgreSQL | 13+ | Bancos de dados (Negócio e Auditoria) |
+| Supabase | — | Infraestrutura de Banco de Dados Cloud |
+| HikariCP | — | Pool de conexões (Dual Datasource) |
+| Lombok | — | Redução de boilerplate |
+| Hibernate | 7.x | Engine de persistência |
 
 ---
 
@@ -86,17 +132,19 @@ Servidor ──────────────── Formacao
 
 ```
 com.example.talentos
-├── config/         AppConfig — seleção dinâmica de implementação via ApplicationContext
-├── controller/     5 controllers REST (GET, POST, PUT, DELETE + filtros)
-├── dto/            Request DTOs (validação) e Response DTOs (dados ao cliente)
-├── exception/      RegraNegocioException + GlobalExceptionHandler (@RestControllerAdvice)
+├── config/         DataSourceConfigs (Negócio/Auditoria) · AppConfig
+├── controller/     Controllers REST (Servidor, Oportunidade, etc.)
+├── dto/            Request DTOs (Bean Validation) e Response DTOs
+├── exception/      GlobalExceptionHandler (@RestControllerAdvice)
 ├── model/
-│   ├── enums/      AreaAtuacao · NivelFormacao · StatusOportunidade · StatusInscricao · TipoDocumento
+│   ├── enums/      Enums de domínio
+│   ├── auditoria/  RegistroAuditoria (Entity)
 │   └──             Servidor · Formacao · Oportunidade · Documento · Inscricao
-├── repository/     Repositórios em memória (Map<Long, T> + AtomicLong)
+├── repository/
+│   ├── negocio/    JpaRepositories para banco primário
+│   └── auditoria/  JpaRepositories para banco de auditoria
 └── service/
-    ├──             Interfaces: ServidorService · FormacaoService · OportunidadeService ...
-    └── impl/       Impl padrão (@Qualifier "padrao") + Impl auditoria (@Qualifier "auditoria")
+    └── impl/       Implementações com @Transactional e persistência real
 ```
 
 ### Padrões e Boas Práticas Aplicados
@@ -166,9 +214,9 @@ O arquivo `testesTalentos.json` na raiz do projeto contém uma **collection Post
 
 ## Próximos Passos (Roadmap)
 
-- [ ] Persistência em banco de dados relacional (PostgreSQL via Spring Data JPA)
+- [x] Persistência em banco de dados relacional (PostgreSQL via Spring Data JPA)
+- [x] Arquitetura Multi-Database (Isolamento de Auditoria)
 - [ ] Autenticação e controle de acesso por perfil (Spring Security + JWT)
 - [ ] Módulo de habilidades e competências do servidor
 - [ ] Notificações automáticas ao servidor sobre status da inscrição
-- [ ] Painel administrativo para gestão de oportunidades
 - [ ] Documentação interativa com Swagger / OpenAPI 3

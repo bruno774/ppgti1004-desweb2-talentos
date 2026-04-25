@@ -21,7 +21,7 @@ public class FormacaoResponseDTO {
     public static FormacaoResponseDTO de(Formacao formacao) {
         FormacaoResponseDTO dto = new FormacaoResponseDTO();
         dto.id = formacao.getId();
-        dto.idServidor = formacao.getIdServidor();
+        dto.idServidor = formacao.getServidor().getId();
         dto.instituicao = formacao.getInstituicao();
         dto.curso = formacao.getCurso();
         dto.nivel = formacao.getNivel();

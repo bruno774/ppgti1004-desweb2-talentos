@@ -5,10 +5,11 @@ import com.example.talentos.dto.ServidorResponseDTO;
 import com.example.talentos.exception.RegraNegocioException;
 import com.example.talentos.model.Servidor;
 import com.example.talentos.model.enums.AreaAtuacao;
-import com.example.talentos.repository.ServidorRepository;
+import com.example.talentos.repository.negocio.ServidorJpaRepository;
 import com.example.talentos.service.ServidorService;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.NoSuchElementException;
@@ -22,11 +23,12 @@ import java.util.stream.Collectors;
  */
 @Service
 @Qualifier("padrao")
+@Transactional
 public class ServidorServiceImpl implements ServidorService {
 
-    private final ServidorRepository repository;
+    private final ServidorJpaRepository repository;
 
-    public ServidorServiceImpl(ServidorRepository repository) {
+    public ServidorServiceImpl(ServidorJpaRepository repository) {
         this.repository = repository;
     }
 
@@ -47,33 +49,36 @@ public class ServidorServiceImpl implements ServidorService {
                 .ativo(dto.isAtivo())
                 .build();
 
-        return ServidorResponseDTO.de(repository.salvar(servidor));
+        return ServidorResponseDTO.de(repository.save(servidor));
     }
 
     @Override
+    @Transactional(readOnly = true)
     public ServidorResponseDTO buscarPorId(Long id) {
-        Servidor servidor = repository.buscarPorId(id)
+        Servidor servidor = repository.findById(id)
                 .orElseThrow(() -> new NoSuchElementException("Servidor não encontrado com ID: " + id));
         return ServidorResponseDTO.de(servidor);
     }
 
     @Override
+    @Transactional(readOnly = true)
     public List<ServidorResponseDTO> buscarTodos() {
-        return repository.buscarTodos().stream()
+        return repository.findAll().stream()
                 .map(ServidorResponseDTO::de)
                 .collect(Collectors.toList());
     }
 
     @Override
+    @Transactional(readOnly = true)
     public List<ServidorResponseDTO> buscarPorAreaAtuacao(AreaAtuacao area) {
-        return repository.buscarPorAreaAtuacao(area).stream()
+        return repository.findByAreaAtuacao(area).stream()
                 .map(ServidorResponseDTO::de)
                 .collect(Collectors.toList());
     }
 
     @Override
     public ServidorResponseDTO atualizar(Long id, ServidorRequestDTO dto) {
-        Servidor existente = repository.buscarPorId(id)
+        Servidor existente = repository.findById(id)
                 .orElseThrow(() -> new NoSuchElementException("Servidor não encontrado com ID: " + id));
 
         String cpfDigitos = dto.getCpf().replaceAll("\\D", "");
@@ -88,13 +93,14 @@ public class ServidorServiceImpl implements ServidorService {
         existente.setAreaAtuacao(dto.getAreaAtuacao());
         existente.setAtivo(dto.isAtivo());
 
-        return ServidorResponseDTO.de(repository.salvar(existente));
+        return ServidorResponseDTO.de(repository.save(existente));
     }
 
     @Override
     public void deletar(Long id) {
-        if (!repository.deletarPorId(id)) {
+        if (!repository.existsById(id)) {
             throw new NoSuchElementException("Servidor não encontrado com ID: " + id);
         }
+        repository.deleteById(id);
     }
 }

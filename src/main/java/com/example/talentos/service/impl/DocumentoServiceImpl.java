@@ -4,12 +4,14 @@ import com.example.talentos.dto.DocumentoRequestDTO;
 import com.example.talentos.dto.DocumentoResponseDTO;
 import com.example.talentos.exception.RegraNegocioException;
 import com.example.talentos.model.Documento;
+import com.example.talentos.model.Servidor;
 import com.example.talentos.model.enums.TipoDocumento;
-import com.example.talentos.repository.DocumentoRepository;
-import com.example.talentos.repository.ServidorRepository;
+import com.example.talentos.repository.negocio.DocumentoJpaRepository;
+import com.example.talentos.repository.negocio.ServidorJpaRepository;
 import com.example.talentos.service.DocumentoService;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -21,12 +23,13 @@ import java.util.stream.Collectors;
  */
 @Service
 @Qualifier("padrao")
+@Transactional
 public class DocumentoServiceImpl implements DocumentoService {
 
-    private final DocumentoRepository repository;
-    private final ServidorRepository servidorRepository;
+    private final DocumentoJpaRepository repository;
+    private final ServidorJpaRepository servidorRepository;
 
-    public DocumentoServiceImpl(DocumentoRepository repository, ServidorRepository servidorRepository) {
+    public DocumentoServiceImpl(DocumentoJpaRepository repository, ServidorJpaRepository servidorRepository) {
         this.repository = repository;
         this.servidorRepository = servidorRepository;
     }
@@ -34,58 +37,62 @@ public class DocumentoServiceImpl implements DocumentoService {
     @Override
     public DocumentoResponseDTO criar(DocumentoRequestDTO dto) {
         // Regra de negócio: o servidor deve existir
-        servidorRepository.buscarPorId(dto.getIdServidor())
+        Servidor servidor = servidorRepository.findById(dto.getIdServidor())
                 .orElseThrow(() -> new RegraNegocioException(
                         "Servidor com ID " + dto.getIdServidor() + " não encontrado."));
 
         Documento documento = Documento.builder()
-                .idServidor(dto.getIdServidor())
+                .servidor(servidor)
                 .nome(dto.getNome())
                 .tipo(dto.getTipo())
                 .urlArquivo(dto.getUrlArquivo())
                 .dataUpload(LocalDateTime.now())
                 .build();
 
-        return DocumentoResponseDTO.de(repository.salvar(documento));
+        return DocumentoResponseDTO.de(repository.save(documento));
     }
 
     @Override
+    @Transactional(readOnly = true)
     public DocumentoResponseDTO buscarPorId(Long id) {
-        return DocumentoResponseDTO.de(repository.buscarPorId(id)
+        return DocumentoResponseDTO.de(repository.findById(id)
                 .orElseThrow(() -> new NoSuchElementException("Documento não encontrado com ID: " + id)));
     }
 
     @Override
+    @Transactional(readOnly = true)
     public List<DocumentoResponseDTO> buscarTodos() {
-        return repository.buscarTodos().stream()
+        return repository.findAll().stream()
                 .map(DocumentoResponseDTO::de)
                 .collect(Collectors.toList());
     }
 
     @Override
+    @Transactional(readOnly = true)
     public List<DocumentoResponseDTO> buscarPorTipo(TipoDocumento tipo) {
-        return repository.buscarPorTipo(tipo).stream()
+        return repository.findByTipo(tipo).stream()
                 .map(DocumentoResponseDTO::de)
                 .collect(Collectors.toList());
     }
 
     @Override
     public DocumentoResponseDTO atualizar(Long id, DocumentoRequestDTO dto) {
-        Documento existente = repository.buscarPorId(id)
+        Documento existente = repository.findById(id)
                 .orElseThrow(() -> new NoSuchElementException("Documento não encontrado com ID: " + id));
 
-        existente.setIdServidor(dto.getIdServidor());
+        existente.setServidor(servidorRepository.getReferenceById(dto.getIdServidor()));
         existente.setNome(dto.getNome());
         existente.setTipo(dto.getTipo());
         existente.setUrlArquivo(dto.getUrlArquivo());
 
-        return DocumentoResponseDTO.de(repository.salvar(existente));
+        return DocumentoResponseDTO.de(repository.save(existente));
     }
 
     @Override
     public void deletar(Long id) {
-        if (!repository.deletarPorId(id)) {
+        if (!repository.existsById(id)) {
             throw new NoSuchElementException("Documento não encontrado com ID: " + id);
         }
+        repository.deleteById(id);
     }
 }

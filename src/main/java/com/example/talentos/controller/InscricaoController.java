@@ -8,6 +8,7 @@ import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
@@ -17,13 +18,20 @@ import java.util.List;
 /**
  * Controller REST para operações sobre Inscricao.
  *
+ * <p>Controle de acesso por papel (RBAC):</p>
  * <ul>
- *   <li>GET    /inscricoes              → lista todas</li>
- *   <li>GET    /inscricoes/{id}         → busca por ID</li>
- *   <li>GET    /inscricoes/categoria    → filtra por status (categoria)</li>
- *   <li>POST   /inscricoes              → cria (201) — valida servidor ativo + oportunidade aberta</li>
- *   <li>PUT    /inscricoes/{id}         → atualiza</li>
- *   <li>DELETE /inscricoes/{id}         → remove</li>
+ *   <li>ROLE_ADMIN  — acesso total</li>
+ *   <li>ROLE_GESTOR — consulta e atualização de inscrições</li>
+ *   <li>ROLE_USUARIO — criar inscrições próprias</li>
+ * </ul>
+ *
+ * <ul>
+ *   <li>GET    /inscricoes              → ADMIN, GESTOR</li>
+ *   <li>GET    /inscricoes/{id}         → ADMIN, GESTOR</li>
+ *   <li>GET    /inscricoes/categoria    → ADMIN, GESTOR</li>
+ *   <li>POST   /inscricoes              → ADMIN, USUARIO (servidor inscreve-se)</li>
+ *   <li>PUT    /inscricoes/{id}         → ADMIN, GESTOR</li>
+ *   <li>DELETE /inscricoes/{id}         → ADMIN</li>
  * </ul>
  */
 @RestController
@@ -38,22 +46,26 @@ public class InscricaoController {
     }
 
     @GetMapping
+    @PreAuthorize("hasAnyRole('ADMIN', 'GESTOR')")
     public ResponseEntity<List<InscricaoResponseDTO>> listarTodas() {
         return ResponseEntity.ok(service.buscarTodos());
     }
 
     @GetMapping("/{id}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'GESTOR')")
     public ResponseEntity<InscricaoResponseDTO> buscarPorId(@PathVariable Long id) {
         return ResponseEntity.ok(service.buscarPorId(id));
     }
 
     @GetMapping("/categoria")
+    @PreAuthorize("hasAnyRole('ADMIN', 'GESTOR')")
     public ResponseEntity<List<InscricaoResponseDTO>> buscarPorCategoria(
             @RequestParam StatusInscricao status) {
         return ResponseEntity.ok(service.buscarPorStatus(status));
     }
 
     @PostMapping
+    @PreAuthorize("hasAnyRole('ADMIN', 'USUARIO')")
     public ResponseEntity<InscricaoResponseDTO> criar(@Valid @RequestBody InscricaoRequestDTO dto) {
         InscricaoResponseDTO criada = service.criar(dto);
         URI location = ServletUriComponentsBuilder.fromCurrentRequest()
@@ -64,6 +76,7 @@ public class InscricaoController {
     }
 
     @PutMapping("/{id}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'GESTOR')")
     public ResponseEntity<InscricaoResponseDTO> atualizar(
             @PathVariable Long id,
             @Valid @RequestBody InscricaoRequestDTO dto) {
@@ -71,6 +84,7 @@ public class InscricaoController {
     }
 
     @DeleteMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Void> deletar(@PathVariable Long id) {
         service.deletar(id);
         return ResponseEntity.noContent().build();

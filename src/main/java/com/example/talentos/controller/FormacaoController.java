@@ -8,6 +8,7 @@ import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
@@ -17,13 +18,20 @@ import java.util.List;
 /**
  * Controller REST para operações sobre Formacao.
  *
+ * <p>Controle de acesso por papel (RBAC):</p>
  * <ul>
- *   <li>GET    /formacoes              → lista todas</li>
- *   <li>GET    /formacoes/{id}         → busca por ID</li>
- *   <li>GET    /formacoes/categoria    → filtra por nível de formação</li>
- *   <li>POST   /formacoes              → cria (201)</li>
- *   <li>PUT    /formacoes/{id}         → atualiza</li>
- *   <li>DELETE /formacoes/{id}         → remove</li>
+ *   <li>ROLE_ADMIN  — acesso total</li>
+ *   <li>ROLE_GESTOR — consulta de formações</li>
+ *   <li>ROLE_USUARIO — cadastro e atualização de suas próprias formações</li>
+ * </ul>
+ *
+ * <ul>
+ *   <li>GET    /formacoes              → ADMIN, GESTOR</li>
+ *   <li>GET    /formacoes/{id}         → ADMIN, GESTOR</li>
+ *   <li>GET    /formacoes/categoria    → ADMIN, GESTOR</li>
+ *   <li>POST   /formacoes              → ADMIN, USUARIO</li>
+ *   <li>PUT    /formacoes/{id}         → ADMIN, USUARIO</li>
+ *   <li>DELETE /formacoes/{id}         → ADMIN</li>
  * </ul>
  */
 @RestController
@@ -38,22 +46,26 @@ public class FormacaoController {
     }
 
     @GetMapping
+    @PreAuthorize("hasAnyRole('ADMIN', 'GESTOR')")
     public ResponseEntity<List<FormacaoResponseDTO>> listarTodas() {
         return ResponseEntity.ok(service.buscarTodos());
     }
 
     @GetMapping("/{id}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'GESTOR')")
     public ResponseEntity<FormacaoResponseDTO> buscarPorId(@PathVariable Long id) {
         return ResponseEntity.ok(service.buscarPorId(id));
     }
 
     @GetMapping("/categoria")
+    @PreAuthorize("hasAnyRole('ADMIN', 'GESTOR')")
     public ResponseEntity<List<FormacaoResponseDTO>> buscarPorCategoria(
             @RequestParam NivelFormacao nivel) {
         return ResponseEntity.ok(service.buscarPorNivel(nivel));
     }
 
     @PostMapping
+    @PreAuthorize("hasAnyRole('ADMIN', 'USUARIO')")
     public ResponseEntity<FormacaoResponseDTO> criar(@Valid @RequestBody FormacaoRequestDTO dto) {
         FormacaoResponseDTO criada = service.criar(dto);
         URI location = ServletUriComponentsBuilder.fromCurrentRequest()
@@ -64,6 +76,7 @@ public class FormacaoController {
     }
 
     @PutMapping("/{id}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'USUARIO')")
     public ResponseEntity<FormacaoResponseDTO> atualizar(
             @PathVariable Long id,
             @Valid @RequestBody FormacaoRequestDTO dto) {
@@ -71,6 +84,7 @@ public class FormacaoController {
     }
 
     @DeleteMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Void> deletar(@PathVariable Long id) {
         service.deletar(id);
         return ResponseEntity.noContent().build();

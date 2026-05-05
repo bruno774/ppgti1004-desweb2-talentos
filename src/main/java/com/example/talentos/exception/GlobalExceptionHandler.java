@@ -2,6 +2,8 @@ package com.example.talentos.exception;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.core.AuthenticationException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -52,6 +54,24 @@ public class GlobalExceptionHandler {
     public ResponseEntity<Map<String, Object>> handleNaoEncontrado(NoSuchElementException ex) {
         return ResponseEntity.status(HttpStatus.NOT_FOUND)
                 .body(erroResponse(HttpStatus.NOT_FOUND, ex.getMessage()));
+    }
+
+    /**
+     * Trata acesso negado pelo @PreAuthorize → 403 Forbidden.
+     */
+    @ExceptionHandler(AccessDeniedException.class)
+    public ResponseEntity<Map<String, Object>> handleAcessoNegado(AccessDeniedException ex) {
+        return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                .body(erroResponse(HttpStatus.FORBIDDEN, "Acesso negado: você não tem permissão para executar esta operação."));
+    }
+
+    /**
+     * Trata falha de autenticação → 401 Unauthorized.
+     */
+    @ExceptionHandler(AuthenticationException.class)
+    public ResponseEntity<Map<String, Object>> handleNaoAutenticado(AuthenticationException ex) {
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                .body(erroResponse(HttpStatus.UNAUTHORIZED, "Autenticação necessária: " + ex.getMessage()));
     }
 
     /**

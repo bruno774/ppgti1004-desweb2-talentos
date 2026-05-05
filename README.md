@@ -119,6 +119,7 @@ classDiagram
 |---|---|---|
 | Java | 17 | Linguagem principal |
 | Spring Boot | 4.0.5 | Framework principal |
+| Spring Security | — | Autenticação HTTP Basic + autorização RBAC via `@PreAuthorize` |
 | Spring Data JPA | — | Persistência e ORM |
 | PostgreSQL | 13+ | Bancos de dados (Negócio e Auditoria) |
 | Supabase | — | Infraestrutura de Banco de Dados Cloud |
@@ -132,10 +133,10 @@ classDiagram
 
 ```
 com.example.talentos
-├── config/         DataSourceConfigs (Negócio/Auditoria) · AppConfig
-├── controller/     Controllers REST (Servidor, Oportunidade, etc.)
-├── dto/            Request DTOs (Bean Validation) e Response DTOs
-├── exception/      GlobalExceptionHandler (@RestControllerAdvice)
+├── config/         SecurityConfig · DataSourceConfigs (Negócio/Auditoria) · AppConfig
+├── controller/     TalentosController · ServidorController · OportunidadeController ...
+├── dto/            Request DTOs (Bean Validation) · Response DTOs · TalentosInfoDTO · TalentosRecursoDTO
+├── exception/      GlobalExceptionHandler (400, 401, 403, 404, 500)
 ├── model/
 │   ├── enums/      Enums de domínio
 │   ├── auditoria/  RegistroAuditoria (Entity)
@@ -150,28 +151,160 @@ com.example.talentos
 ### Padrões e Boas Práticas Aplicados
 
 - **Separação de camadas** — Model → Repository → Service → Controller, sem dependências invertidas
-- **DTO Pattern** — entidades internas nunca trafegam na API
-- **Strategy/Decorator com @Qualifier** — duas implementações de serviço intercambiáveis sem alterar controllers
-- **Tratamento global de erros** — respostas JSON padronizadas para 400, 404 e 500
-- **Regras de negócio centralizadas** — todas as validações semânticas ficam na camada de serviço
+- **DTO Pattern** — entidades internas nunca trafegam na API; dados sensíveis são mascarados
+- **RBAC declarativo** — `@PreAuthorize` em cada método controla acesso por papel
+- **Strategy com @Qualifier** — implementações de serviço intercambiáveis sem alterar controllers
+- **Tratamento global de erros** — respostas JSON padronizadas para 400, 401, 403, 404 e 500
+- **Regras de negócio centralizadas** — validações semânticas ficam exclusivamente na camada de serviço
 
 ---
 
-## Endpoints Disponíveis
+## Camada de Segurança
 
-Cada recurso expõe o conjunto completo de operações REST:
+A aplicação utiliza **Spring Security** com autenticação **HTTP Basic** e autorização baseada em papéis (RBAC). Cada método dos controllers é protegido com `@EnableMethodSecurity` + `@PreAuthorize`.
 
-| Método | Rota | Descrição |
-|---|---|---|
-| `GET` | `/servidores` | Lista todos os servidores |
-| `GET` | `/servidores/{id}` | Busca servidor por ID |
-| `GET` | `/servidores/categoria?area=TECNOLOGIA` | Filtra por área de atuação |
-| `POST` | `/servidores` | Cadastra novo servidor |
-| `PUT` | `/servidores/{id}` | Atualiza dados do servidor |
-| `DELETE` | `/servidores/{id}` | Remove servidor |
+### Papéis e Usuários de Teste
 
-> O mesmo padrão se aplica a `/formacoes`, `/oportunidades`, `/documentos` e `/inscricoes`.  
-> Oportunidades possuem filtro adicional: `GET /oportunidades/area?area=EDUCACAO`.
+| Usuário | Senha | Role | Permissões |
+|---|---|---|---|
+| `admin` | `admin123` | `ROLE_ADMIN` | Acesso total — todos os endpoints |
+| `gestor` | `gestor123` | `ROLE_GESTOR` | Gerência de servidores e oportunidades; consulta de inscrições/docs/formações |
+| `usuario` | `usuario123` | `ROLE_USUARIO` | Consulta oportunidades; cadastra inscrições, documentos e formações próprios |
+
+> **Como autenticar:** `curl -u admin:admin123 http://localhost:8080/servidores`
+
+### Matriz de Permissões
+
+Legenda: ✅ Permitido · 🚫 403 Forbidden · 🔒 401 Unauthorized
+
+#### `/talentos` — Endpoints de segurança
+
+| Endpoint | Método | ADMIN | GESTOR | USUARIO | Sem Auth |
+|---|---|:---:|:---:|:---:|:---:|
+| `/talentos/info` | `GET` | ✅ | ✅ | ✅ | ✅ |
+| `/talentos/recursos` | `GET` | ✅ | ✅ | ✅ | 🔒 |
+| `/talentos/recursos/{id}` | `GET` | 🚫 | ✅ | ✅ | 🔒 |
+| `/talentos/recursos/{id}` | `DELETE` | ✅ | 🚫 | 🚫 | 🔒 |
+
+#### `/servidores`
+
+| Endpoint | Método | ADMIN | GESTOR | USUARIO | Sem Auth |
+|---|---|:---:|:---:|:---:|:---:|
+| `/servidores` | `GET` | ✅ | ✅ | 🚫 | 🔒 |
+| `/servidores/{id}` | `GET` | ✅ | ✅ | 🚫 | 🔒 |
+| `/servidores/categoria` | `GET` | ✅ | ✅ | 🚫 | 🔒 |
+| `/servidores` | `POST` | ✅ | ✅ | 🚫 | 🔒 |
+| `/servidores/{id}` | `PUT` | ✅ | ✅ | 🚫 | 🔒 |
+| `/servidores/{id}` | `DELETE` | ✅ | 🚫 | 🚫 | 🔒 |
+
+#### `/oportunidades`
+
+| Endpoint | Método | ADMIN | GESTOR | USUARIO | Sem Auth |
+|---|---|:---:|:---:|:---:|:---:|
+| `/oportunidades` | `GET` | ✅ | ✅ | ✅ | 🔒 |
+| `/oportunidades/{id}` | `GET` | ✅ | ✅ | ✅ | 🔒 |
+| `/oportunidades/categoria` | `GET` | ✅ | ✅ | ✅ | 🔒 |
+| `/oportunidades/area` | `GET` | ✅ | ✅ | ✅ | 🔒 |
+| `/oportunidades` | `POST` | ✅ | ✅ | 🚫 | 🔒 |
+| `/oportunidades/{id}` | `PUT` | ✅ | ✅ | 🚫 | 🔒 |
+| `/oportunidades/{id}` | `DELETE` | ✅ | 🚫 | 🚫 | 🔒 |
+
+#### `/inscricoes` · `/documentos` · `/formacoes`
+
+| Endpoint | Método | ADMIN | GESTOR | USUARIO | Sem Auth |
+|---|---|:---:|:---:|:---:|:---:|
+| `/{recurso}` | `GET` | ✅ | ✅ | 🚫 | 🔒 |
+| `/{recurso}/{id}` | `GET` | ✅ | ✅ | 🚫 | 🔒 |
+| `/{recurso}/categoria` | `GET` | ✅ | ✅ | 🚫 | 🔒 |
+| `/inscricoes` | `POST` | ✅ | 🚫 | ✅ | 🔒 |
+| `/documentos` | `POST` | ✅ | 🚫 | ✅ | 🔒 |
+| `/formacoes` | `POST` | ✅ | 🚫 | ✅ | 🔒 |
+| `/documentos/{id}` | `PUT` | ✅ | 🚫 | ✅ | 🔒 |
+| `/formacoes/{id}` | `PUT` | ✅ | 🚫 | ✅ | 🔒 |
+| `/inscricoes/{id}` | `PUT` | ✅ | ✅ | 🚫 | 🔒 |
+| `/{recurso}/{id}` | `DELETE` | ✅ | 🚫 | 🚫 | 🔒 |
+
+---
+
+## Desacoplamento: Entidade vs DTO
+
+O padrão DTO isola a entidade de domínio da API. A entidade carrega mapeamentos JPA, dados sensíveis e coleções — nada disso chega ao cliente.
+
+### Exemplo: `Servidor`
+
+**1. Entidade (banco de dados — nunca exposta diretamente)**
+
+```json
+{
+  "id": 1,
+  "nome": "João Silva",
+  "cpf": "12345678901",
+  "email": "joao.silva@gov.br",
+  "cargo": "Analista de TI",
+  "areaAtuacao": "TECNOLOGIA",
+  "ativo": true,
+  "inscricoes": [ ... ],
+  "documentos": [ ... ],
+  "formacoes": [ ... ]
+}
+```
+
+**2. Request DTO — corpo enviado pelo cliente (`POST /servidores`)**
+
+```json
+{
+  "nome": "João Silva",
+  "cpf": "12345678901",
+  "email": "joao.silva@gov.br",
+  "cargo": "Analista de TI",
+  "areaAtuacao": "TECNOLOGIA",
+  "ativo": true
+}
+```
+
+> `id` não é enviado (gerado pelo banco). Campos obrigatórios validados com `@NotBlank`, `@NotNull`, `@Email`.
+
+**3. Response DTO — resposta da API (`201 Created`)**
+
+```json
+{
+  "id": 1,
+  "nome": "João Silva",
+  "cpfMascarado": "***.456.***.**-**",
+  "email": "joao.silva@gov.br",
+  "cargo": "Analista de TI",
+  "areaAtuacao": "TECNOLOGIA",
+  "ativo": true
+}
+```
+
+> CPF mascarado (dado sensível protegido). Coleções JPA (`inscricoes`, `documentos`, `formacoes`) omitidas.
+
+**4. Erro de validação (`400 Bad Request`)**
+
+```json
+{
+  "timestamp": "2026-05-04T22:00:00",
+  "status": 400,
+  "erro": "Bad Request",
+  "mensagem": "Validação falhou. Verifique os campos.",
+  "campos": {
+    "email": "E-mail inválido",
+    "nome": "Nome é obrigatório"
+  }
+}
+```
+
+**5. Acesso negado (`403 Forbidden`)**
+
+```json
+{
+  "timestamp": "2026-05-04T22:00:00",
+  "status": 403,
+  "erro": "Forbidden",
+  "mensagem": "Acesso negado: você não tem permissão para executar esta operação."
+}
+```
 
 ---
 
@@ -210,13 +343,3 @@ O arquivo `testesTalentos.json` na raiz do projeto contém uma **collection Post
 - Violações de regra de negócio (400 com mensagem clara)
 - Recursos não encontrados (404)
 
----
-
-## Próximos Passos (Roadmap)
-
-- [x] Persistência em banco de dados relacional (PostgreSQL via Spring Data JPA)
-- [x] Arquitetura Multi-Database (Isolamento de Auditoria)
-- [ ] Autenticação e controle de acesso por perfil (Spring Security + JWT)
-- [ ] Módulo de habilidades e competências do servidor
-- [ ] Notificações automáticas ao servidor sobre status da inscrição
-- [ ] Documentação interativa com Swagger / OpenAPI 3

@@ -8,6 +8,7 @@ import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
@@ -17,13 +18,20 @@ import java.util.List;
 /**
  * Controller REST para operações sobre Documento.
  *
+ * <p>Controle de acesso por papel (RBAC):</p>
  * <ul>
- *   <li>GET    /documentos              → lista todos</li>
- *   <li>GET    /documentos/{id}         → busca por ID</li>
- *   <li>GET    /documentos/categoria    → filtra por tipo (categoria)</li>
- *   <li>POST   /documentos              → cria (201)</li>
- *   <li>PUT    /documentos/{id}         → atualiza</li>
- *   <li>DELETE /documentos/{id}         → remove</li>
+ *   <li>ROLE_ADMIN  — acesso total</li>
+ *   <li>ROLE_GESTOR — consulta de documentos</li>
+ *   <li>ROLE_USUARIO — upload e gestão de seus próprios documentos</li>
+ * </ul>
+ *
+ * <ul>
+ *   <li>GET    /documentos              → ADMIN, GESTOR</li>
+ *   <li>GET    /documentos/{id}         → ADMIN, GESTOR</li>
+ *   <li>GET    /documentos/categoria    → ADMIN, GESTOR</li>
+ *   <li>POST   /documentos              → ADMIN, USUARIO</li>
+ *   <li>PUT    /documentos/{id}         → ADMIN, USUARIO</li>
+ *   <li>DELETE /documentos/{id}         → ADMIN</li>
  * </ul>
  */
 @RestController
@@ -38,22 +46,26 @@ public class DocumentoController {
     }
 
     @GetMapping
+    @PreAuthorize("hasAnyRole('ADMIN', 'GESTOR')")
     public ResponseEntity<List<DocumentoResponseDTO>> listarTodos() {
         return ResponseEntity.ok(service.buscarTodos());
     }
 
     @GetMapping("/{id}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'GESTOR')")
     public ResponseEntity<DocumentoResponseDTO> buscarPorId(@PathVariable Long id) {
         return ResponseEntity.ok(service.buscarPorId(id));
     }
 
     @GetMapping("/categoria")
+    @PreAuthorize("hasAnyRole('ADMIN', 'GESTOR')")
     public ResponseEntity<List<DocumentoResponseDTO>> buscarPorCategoria(
             @RequestParam TipoDocumento tipo) {
         return ResponseEntity.ok(service.buscarPorTipo(tipo));
     }
 
     @PostMapping
+    @PreAuthorize("hasAnyRole('ADMIN', 'USUARIO')")
     public ResponseEntity<DocumentoResponseDTO> criar(@Valid @RequestBody DocumentoRequestDTO dto) {
         DocumentoResponseDTO criado = service.criar(dto);
         URI location = ServletUriComponentsBuilder.fromCurrentRequest()
@@ -64,6 +76,7 @@ public class DocumentoController {
     }
 
     @PutMapping("/{id}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'USUARIO')")
     public ResponseEntity<DocumentoResponseDTO> atualizar(
             @PathVariable Long id,
             @Valid @RequestBody DocumentoRequestDTO dto) {
@@ -71,6 +84,7 @@ public class DocumentoController {
     }
 
     @DeleteMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Void> deletar(@PathVariable Long id) {
         service.deletar(id);
         return ResponseEntity.noContent().build();

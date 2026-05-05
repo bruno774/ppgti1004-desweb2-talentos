@@ -43,6 +43,13 @@
       "description": "ID gerado após criar a primeira inscrição"
     }
   ],
+  "auth": {
+    "type": "basic",
+    "basic": [
+      {"key": "username", "value": "admin", "type": "string"},
+      {"key": "password", "value": "admin123", "type": "string"}
+    ]
+  },
   "item": [
     {
       "name": "1. Servidores",
